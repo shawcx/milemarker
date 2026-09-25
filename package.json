@@ -1,0 +1,26 @@
+{
+  "name": "dashcam-track-viewer",
+  "version": "1.0.0",
+  "description": "Electron + Leaflet viewer for dashcam GPS tracks",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.4.5"
+  },
+  "dependencies": {
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "ffmpeg-static": "^5.3.0",
+    "leaflet": "^1.9.4"
+  },
+  "private": true,
+  "allowScripts": {
+    "ffmpeg-static@5.3.0": true,
+    "@ffprobe-installer/linux-x64@5.2.0": true
+  }
+}

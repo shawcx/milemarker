@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; media-src file: blob:; connect-src 'none'">
+  <title>Dashcam Track Viewer</title>
+  <link rel="stylesheet" href="../node_modules/leaflet/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="no-video no-track">
+  <div id="map"></div>
+
+  <section id="panel" class="panel card">
+    <header id="panel-header" class="toolbar" title="Drag empty space to move">
+      <button id="btn-open-video">Open video…</button>
+      <button id="btn-open-track" title="Open a GPX / NMEA file">Open GPS…</button>
+      <span class="sep"></span>
+      <label class="check"><input type="checkbox" id="chk-follow" checked> Follow</label>
+      <label class="offset" title="GPS offset: shift GPS relative to video (seconds). Positive = GPS later.">
+        Offset <input type="number" id="num-offset" value="0" step="0.5"> s
+      </label>
+      <span class="drag-space"></span>
+    </header>
+
+    <div id="tripbar" class="tripbar hidden">
+      <button id="btn-prev" class="icon" title="Previous video">◀</button>
+      <select id="sel-video" title="Videos in this trip"></select>
+      <button id="btn-next" class="icon" title="Next video">▶</button>
+      <span id="trip-summary" class="muted"></span>
+    </div>
+
+    <div id="video-wrap" class="video-wrap">
+      <video id="video" controls controlslist="nofullscreen" disablepictureinpicture preload="metadata"></video>
+      <svg id="gauge" class="gauge hidden" aria-label="Speed"></svg>
+      <button id="btn-fullscreen" class="fs-btn hidden" title="Fullscreen (F)" aria-label="Fullscreen">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path class="fs-enter" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+          <path class="fs-exit" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" />
+        </svg>
+      </button>
+      <div id="video-empty" class="empty">
+        <p>Open or drop dashcam videos<br><span class="muted">Several files play as one trip · GPX / NMEA files work too</span></p>
+      </div>
+    </div>
+
+    <div id="speed-chart" class="speed-chart" title="Speed over time — click to seek"></div>
+    <div id="waveform" class="waveform hidden" title="Audio — click to seek"></div>
+    <div class="clipbar">
+      <button id="btn-in" title="Set clip start to current time (I)">⟦ In</button>
+      <span id="clip-range" class="range">–</span>
+      <button id="btn-out" title="Set clip end to current time (O)">Out ⟧</button>
+      <button id="btn-clip-clear" class="icon" title="Reset to whole video">✕</button>
+      <span id="clip-status" class="muted clip-status"></span>
+      <select id="sel-mode" title="Fast: lossless stream copy, starts on the nearest keyframe before In.&#10;Precise: re-encodes, frame-accurate but slower.">
+        <option value="fast">Fast</option>
+        <option value="precise">Precise</option>
+      </select>
+      <label class="check" title="Write the clip's GPS track as a .gpx next to it (auto-loads when the clip is opened here)">
+        <input type="checkbox" id="chk-gpx" checked> GPX
+      </label>
+      <button id="btn-export" class="primary" title="Export the In–Out range as a new video">Export…</button>
+    </div>
+
+    <section id="meta" class="meta">
+      <div class="meta-header">
+        <button id="btn-meta" class="meta-toggle" title="Show / hide details">
+          <span class="chevron">▾</span>
+          <span id="file-name" class="meta-title">No file loaded</span>
+        </button>
+        <div class="segmented" role="radiogroup" aria-label="Speed units">
+          <button id="unit-kmh" role="radio" data-unit="kmh">km/h</button>
+          <button id="unit-mph" role="radio" data-unit="mph">mph</button>
+        </div>
+      </div>
+      <div class="meta-body">
+        <div class="meta-grid">
+          <span class="label">Speed</span><span><span id="t-speed" class="value">–</span> <span id="t-speed-unit" class="unit">km/h</span></span>
+          <span class="label">Time</span><span id="t-time" class="value small">–</span>
+          <span class="label">Heading</span><span><span id="t-heading" class="value">–</span><span class="unit">°</span></span>
+          <span class="label">Position</span><span id="t-pos" class="value small">–</span>
+        </div>
+        <div class="meta-info">
+          <span id="i-source" class="muted">–</span>
+          <span class="muted">·</span> <span id="i-points">–</span> pts
+          <span class="muted">·</span> <span id="i-dist">–</span>
+          <span class="muted">·</span> <span id="i-dur">–</span>
+        </div>
+        <div id="legend" class="legend hidden"></div>
+      </div>
+    </section>
+    <div id="panel-resize" class="resize-grip" title="Drag to resize"></div>
+  </section>
+
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-box">
+      <div id="overlay-text">Scanning video for GPS data…</div>
+      <div class="progress"><div id="progress-bar"></div></div>
+      <div class="overlay-actions"><button id="btn-overlay-cancel" class="hidden">Cancel</button></div>
+    </div>
+  </div>
+
+  <script src="../node_modules/leaflet/dist/leaflet.js"></script>
+  <script src="gauge.js"></script>
+  <script src="panel.js"></script>
+  <script src="speedchart.js"></script>
+  <script src="waveform.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
