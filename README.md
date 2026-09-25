@@ -1,6 +1,10 @@
-# Dashcam Track Viewer
+# Milemarker
 
-Electron app that plays a dashcam video alongside its GPS track on an OpenStreetMap (Leaflet) map.
+Dashcam footage is mostly uneventful; you pull the SD card when something happens. Milemarker shows the
+whole trip on an OpenStreetMap map, with speed and audio alongside the video, so you can see the drive at a
+glance and jump straight to the incident, then export just that clip.
+
+Built with Electron and Leaflet.
 
 ```sh
 npm install
@@ -15,10 +19,16 @@ node scripts/make-sample.js 20 --trip 3   # samples/trip/TRIP_0001..3.mp4: one d
   start time) and play back to back. The map shows the whole trip; ◀ / ▶ and the list switch videos, and
   clicking anywhere on the trip's track opens the right video at that spot. Speed graph, waveform and
   clip export work on the current video.
+- **Incident finder**: hard braking (≥ 0.3 g over 1–3 s; "hard stop" if it ends near standstill, severe at
+  ≥ 0.45 g) and swerves (≥ 0.4 g lateral above 25 km/h) are detected from the GPS speed/heading
+  (`src/gps/events.js`). They're marked on the map and speed graph; ◀ / ▶ in the events bar (or `N` / `P`)
+  step through them across the whole trip, starting 5 s early with the clip range preset around the event.
+  Videos opened from a camera's locked folder (`RO`, `Event`, `EMR`, …) are badged "Locked by camera".
+  Note: ~1 Hz GPS shows braking/swerving, not the impact itself; the tested cameras don't store G-sensor data.
 - **GPS cache**: after scanning a video, its GPS is saved next to it as `<video name>.gpx`, so opening it
   again skips the scan (a 1.8 GB file: ~1.3 s → ~0.1 s). The cache keeps each fix's video time and the
   no-fix count. It's ignored and rewritten if the video is newer than it; a GPX you put there yourself
-  (without our `dtv:source` tag) is always used as is.
+  (without our `mm:source` tag) is always used as is.
 - Open or drag-and-drop a video; the GPS track is extracted and drawn, coloured by speed.
 - The marker follows video playback (interpolated, rotated to heading); click the track to seek.
 - **GPS offset** shifts the track against the video when the two are slightly out of sync.
@@ -52,7 +62,7 @@ Each parser returns `{ lat, lon, speed (km/h), heading, timestamp }` points; `fi
 - Other sources are timed from their GPS timestamps relative to the first fix.
 - Gaps longer than 3 s are shown as dropouts: dashed on the map, a break in the speed graph, and
   "no GPS fix" in the telemetry.
-- Exported clips' GPX sidecars carry each point's video time (`<dtv:videoTime>` extension), so a clip
+- Exported clips' GPX sidecars carry each point's video time (`<mm:videoTime>` element), so a clip
   starting before the first fix or across a dropout reopens in sync. For a new camera format,
 add a parser and a step in `loadTrackForVideo()`.
 

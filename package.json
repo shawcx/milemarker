@@ -1,7 +1,8 @@
 {
-  "name": "dashcam-track-viewer",
+  "name": "milemarker",
+  "productName": "Milemarker",
   "version": "1.0.0",
-  "description": "Electron + Leaflet viewer for dashcam GPS tracks",
+  "description": "Visualize dashcam trips on a map and jump straight to the moment that matters",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

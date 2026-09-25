@@ -15,8 +15,8 @@ const loadUnits = () => { try { return UNITS[localStorage.getItem('units')] ? lo
 
 const state = {
   videos: [],     // the trip: [{ videoPath, videoUrl, name, track }] in playback order
-  current: -1,    // index into videos of the one loaded in the <video>
-  trackOnly: null, // a GPS file opened without any video
+  current: -1,    // index into the trip (videos, or GPS-only tracks) of the one shown
+  tracks: [],      // GPS files opened without video: [{ name, track }] in name order
   points: [],   // current track's [{ t, lat, lon, speed, heading, timestamp }]
   offset: 0,    // seconds added to video time to get track time
   follow: true,
@@ -25,11 +25,13 @@ const state = {
   overview: true,  // map shows the whole trip; Follow only takes over once the user zooms in / asks
   units: loadUnits(),
   maxSpeed: 0,     // trip's top speed, km/h
+  events: [],      // trip-wide incident candidates: [{ vi (track index), ...event }] in trip order
+  eventIdx: -1,    // the one last jumped to
 };
 const unit = () => UNITS[state.units];
 const toUnit = (kmh) => (kmh == null ? null : kmh * unit().factor);
 
-const chart = createSpeedChart($('speed-chart'), { onSeek: seekTo }); // eslint-disable-line no-undef
+const chart = createSpeedChart($('speed-chart'), { onSeek: seekTo, onEvent: (k) => jumpToEvent(k) }); // eslint-disable-line no-undef
 const wave = createWaveform($('waveform'), { onSeek: seekTo }); // eslint-disable-line no-undef
 let audioRequest = 0; // ignores results for a video that's since been replaced
 
@@ -126,6 +128,13 @@ function centerOn(latlng, zoom = map.getZoom()) {
 
 const trackLayer = L.layerGroup().addTo(map);
 const clipLayer = L.layerGroup().addTo(map); // selected clip range, drawn behind the track
+const eventLayer = L.layerGroup().addTo(map); // incident markers
+const eventIcon = L.divIcon({
+  className: 'ev-marker',
+  iconSize: [24, 22],
+  iconAnchor: [12, 20],
+  html: '<svg width="24" height="22" viewBox="0 0 16 16"><path d="M8 1.5 15 14H1z"/><path class="ev-bang" d="M8 6v3.6M8 11.4v.4"/></svg>',
+});
 const carIcon = L.divIcon({
   className: 'car-icon',
   iconSize: [28, 28],
@@ -284,13 +293,16 @@ function prepareTrack(track) {
 }
 
 /** Every track on the map: the trip's videos, or a standalone GPS file. */
-const tripTracks = () => (state.videos.length ? state.videos.map((v) => v.track) : state.trackOnly ? [state.trackOnly] : []);
+const tripTracks = () => (state.videos.length ? state.videos : state.tracks).map((item) => item.track);
 const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`);
 
 /** Draw the whole trip and fit the map to it. */
 function drawTrip() {
   trackLayer.clearLayers();
   clipLayer.clearLayers();
+  state.events = tripTracks().flatMap((t, vi) => (t.events || []).map((e) => ({ vi, ...e })));
+  state.eventIdx = -1;
+  drawEventMarkers();
   carMarker = null;
   const tracks = tripTracks().filter((t) => t.points.length);
   const all = tracks.flatMap((t) => t.points);
@@ -326,10 +338,17 @@ function drawTrip() {
     }
   });
 
+  // Trip markers: grey dot where each further file begins, white start, black end (on top).
+  const named = tripItems().filter((item) => item.track.points.length);
+  named.slice(1).forEach((item) => {
+    const p = item.track.points[0];
+    L.circleMarker([p.lat, p.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#8a9099', fillOpacity: 1 })
+      .bindTooltip(item.name).addTo(trackLayer);
+  });
   const first = all[0], last = all[all.length - 1];
-  L.circleMarker([first.lat, first.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#2ecc71', fillOpacity: 1 })
+  L.circleMarker([first.lat, first.lon], { radius: 9, color: '#1b1e22', weight: 2.5, fillColor: '#fff', fillOpacity: 1 })
     .bindTooltip('Start').addTo(trackLayer);
-  L.circleMarker([last.lat, last.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#e74c3c', fillOpacity: 1 })
+  L.circleMarker([last.lat, last.lon], { radius: 9, color: '#fff', weight: 2.5, fillColor: '#111', fillOpacity: 1 })
     .bindTooltip('End').addTo(trackLayer);
   carMarker = L.marker([first.lat, first.lon], { icon: carIcon, interactive: false, zIndexOffset: 1000 }).addTo(trackLayer);
 
@@ -363,6 +382,7 @@ function showTrack(track) {
   $('i-dur').textContent = pts.length ? fmtDuration(pts[pts.length - 1].t - pts[0].t) : '–';
   gauge.show(Boolean(video.src) && pts.some((p) => p.speed != null));
   refreshChart();
+  updateEventsBar();
   updatePosition({ center: false });
   updateClipUi();
 }
@@ -389,6 +409,9 @@ function setUnits(key) {
   try { localStorage.setItem('units', key); } catch { /* storage unavailable */ }
   applyUnits();
   if (state.points.length) updatePosition({ center: false });
+  refreshChart();
+  updateEventsBar();
+  drawEventMarkers(); // their hover text includes speeds
 }
 for (const b of document.querySelectorAll('.segmented button')) {
   b.addEventListener('click', () => setUnits(b.dataset.unit));
@@ -406,6 +429,9 @@ function refreshChart() {
   const range = hasDuration() ? [0, video.duration]
     : pts.length ? [pts[0].t - state.offset, pts[pts.length - 1].t - state.offset] : null;
   chart.setData(series, range);
+  chart.setEvents(state.events.map((ev, key) => ({ ev, key }))
+    .filter(({ ev }) => ev.vi === Math.max(0, state.current))
+    .map(({ ev, key }) => ({ x: ev.t - state.offset, label: eventText(ev), key })));
   wave.setDomain(range);
   updatePlayhead();
 }
@@ -490,8 +516,8 @@ map.on('click', (e) => {
   engageFollow();
   const t = Math.max(0, best.p.t - state.offset);
   if (!state.videos.length) {
-    carMarker?.setLatLng([best.p.lat, best.p.lon]);
-    updateTelemetry(best.p);
+    if (best.vi !== state.current) showTrackItem(best.vi);
+    seekTo(t);
   } else if (best.vi !== state.current) {
     showVideo(best.vi, { seek: t, autoplay: !video.paused });
   } else {
@@ -515,23 +541,45 @@ window.dashcam.onScanProgress(({ index, count, name, progress }) => {
 
 const currentVideo = () => state.videos[state.current] ?? null;
 
+/** Trip items: the videos, or the GPS-only tracks. Both have { name, track }. */
+const tripItems = () => (state.videos.length ? state.videos : state.tracks);
+
+/** Common to switching item: title, trip bar position, clip reset. */
+function selectItem(i, item, title) {
+  state.current = i;
+  state.clipIn = state.clipOut = null;
+  setClipStatus('');
+  $('file-name').textContent = item.name;
+  $('file-name').title = title;
+  $('sel-video').value = String(i);
+  $('btn-prev').disabled = i === 0;
+  $('btn-next').disabled = i === tripItems().length - 1;
+}
+
 /** Load video `i` of the trip into the player. */
 function showVideo(i, { seek = 0, autoplay = true } = {}) {
   const v = state.videos[i];
   if (!v) return;
-  state.current = i;
-  state.clipIn = state.clipOut = null;
-  setClipStatus('');
+  selectItem(i, v, v.videoPath);
   video.src = v.videoUrl;
   if (seek) video.addEventListener('loadedmetadata', () => { video.currentTime = seek; }, { once: true });
   if (autoplay) video.play().catch((err) => console.warn('Autoplay failed:', err.message));
-  $('file-name').textContent = v.name;
-  $('file-name').title = v.videoPath;
-  $('sel-video').value = String(i);
-  $('btn-prev').disabled = i === 0;
-  $('btn-next').disabled = i === state.videos.length - 1;
   loadWaveform(v.videoPath);
   showTrack(v.track);
+}
+
+/** Show GPS-only track `i`. */
+function showTrackItem(i) {
+  const t = state.tracks[i];
+  if (!t) return;
+  selectItem(i, t, t.name);
+  showTrack(t.track);
+}
+
+/** Switch trip item (trip bar, map clicks, events), whichever kind the trip is. */
+function showItem(i, opts) {
+  if (state.videos.length) showVideo(i, opts);
+  else showTrackItem(i);
 }
 
 // Continuous playback through the trip.
@@ -539,47 +587,74 @@ video.addEventListener('ended', () => {
   if (state.current < state.videos.length - 1) showVideo(state.current + 1);
 });
 
+/** Fill the trip bar (shown only for more than one item). */
+function setupTripBar(items, noun) {
+  const sel = $('sel-video');
+  sel.replaceChildren(...items.map((item, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = `${i + 1}/${items.length} · ${item.locked ? '🔒 ' : ''}${item.name}`;
+    return o;
+  }));
+  sel.title = `${noun[0].toUpperCase()}${noun.slice(1)} in this trip`;
+  const dist = items.reduce((sum, item) => sum + (item.track.dist || 0), 0);
+  $('trip-summary').textContent = `${items.length} ${noun} · ${fmtDist(dist)}`;
+  $('tripbar').classList.toggle('hidden', items.length < 2);
+}
+
 function loadTrip(videos) {
   state.videos = videos.map((v) => ({ ...v, track: prepareTrack(v.track) }));
-  state.trackOnly = null;
+  state.tracks = [];
   document.body.classList.remove('no-video');
   $('video-empty').classList.add('hidden');
   $('btn-fullscreen').classList.remove('hidden');
-
-  // Trip bar (only for more than one video).
-  const sel = $('sel-video');
-  sel.replaceChildren(...state.videos.map((v, i) => {
-    const o = document.createElement('option');
-    o.value = String(i);
-    o.textContent = `${i + 1}/${state.videos.length} · ${v.name}`;
-    return o;
-  }));
-  const dist = state.videos.reduce((sum, v) => sum + (v.track.dist || 0), 0);
-  $('trip-summary').textContent = `${state.videos.length} videos · ${fmtDist(dist)}`;
-  $('tripbar').classList.toggle('hidden', state.videos.length < 2);
-
+  setupTripBar(state.videos, 'videos');
   drawTrip();
   showVideo(0);
 }
 
-/** A GPS file on its own: overlays the current video if there is one. */
-function loadTrackFile({ name, track }) {
-  prepareTrack(track);
-  const v = currentVideo();
-  if (v) {
-    v.track = track;
-  } else {
-    state.trackOnly = track;
-    $('file-name').textContent = name;
-    $('file-name').title = name;
+/** Take the video(s) out of the player and go back to the compact, video-less layout. */
+function unloadVideos() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+  state.videos = [];
+  state.current = -1;
+  audioRequest++; // drop any waveform still decoding
+  $('waveform').classList.add('hidden');
+  $('video-empty').classList.remove('hidden');
+  $('btn-fullscreen').classList.add('hidden');
+  document.body.classList.add('no-video');
+  gauge.show(false);
+}
+
+const baseName = (name) => name.replace(/\.[^.]+$/, '').toLowerCase();
+
+/**
+ * GPS file(s) opened. If every one matches an open video by name (X.gpx ↔ X.MP4), each
+ * replaces that video's track. Otherwise the video(s) are unloaded and the files are shown
+ * on their own, as a trip of tracks.
+ */
+function loadTrackFiles(items) {
+  const matchOf = (item) => state.videos.find((v) => baseName(v.name) === baseName(item.name));
+  if (state.videos.length && items.every(matchOf)) {
+    for (const item of items) matchOf(item).track = prepareTrack(item.track);
+    setupTripBar(state.videos, 'videos');
+    drawTrip();
+    showTrack(currentVideo().track);
+    return;
   }
+  if (state.videos.length) unloadVideos();
+  state.tracks = items.map(({ name, track }) => ({ name, track: prepareTrack(track) }));
+  setupTripBar(state.tracks, 'tracks');
   drawTrip();
-  showTrack(track);
+  showTrackItem(0);
 }
 
 function applyResult(res) {
   if (res?.videos?.length) loadTrip(res.videos);
-  else if (res?.track) loadTrackFile(res);
+  else if (res?.tracks?.length) loadTrackFiles(res.tracks);
 }
 
 async function run(label, fn) {
@@ -595,11 +670,11 @@ async function run(label, fn) {
 }
 
 $('btn-open-video').addEventListener('click', () => run('Reading GPS data…', window.dashcam.openVideo));
-$('btn-open-track').addEventListener('click', () => run('Reading GPS file…', window.dashcam.openTrack));
+$('btn-open-track').addEventListener('click', () => run('Reading GPS files…', window.dashcam.openTrack));
 window.dashcam.onOpenArgs((paths) => run('Reading GPS data…', () => window.dashcam.openPaths(paths)));
-$('sel-video').addEventListener('change', (e) => showVideo(Number(e.target.value), { autoplay: !video.paused }));
-$('btn-prev').addEventListener('click', () => showVideo(state.current - 1, { autoplay: !video.paused }));
-$('btn-next').addEventListener('click', () => showVideo(state.current + 1, { autoplay: !video.paused }));
+$('sel-video').addEventListener('change', (e) => showItem(Number(e.target.value), { autoplay: !video.paused }));
+$('btn-prev').addEventListener('click', () => showItem(state.current - 1, { autoplay: !video.paused }));
+$('btn-next').addEventListener('click', () => showItem(state.current + 1, { autoplay: !video.paused }));
 
 function setFollow(on) {
   state.follow = on;
@@ -659,6 +734,7 @@ function updateClipUi() {
     wave.setClip(null);
     return;
   }
+  if (state.clipOut != null && state.clipOut > video.duration) state.clipOut = video.duration;
   const a = clipStart(), b = clipEnd();
   const custom = state.clipIn != null || state.clipOut != null;
   $('clip-range').textContent = `${fmtClock(a)}–${fmtClock(b)}`;
@@ -734,11 +810,88 @@ window.dashcam.onExportProgress((p) => { $('progress-bar').style.width = `${Math
 video.addEventListener('loadedmetadata', () => { refreshChart(); updateClipUi(); });
 window.addEventListener('keydown', (e) => {
   if (e.target.matches('input, select, textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key === 'i' || e.key === 'I') setClipIn(video.currentTime);
+  if (e.key === 'n' || e.key === 'N') stepEvent(1);
+  else if (e.key === 'p' || e.key === 'P') stepEvent(-1);
+  else if (e.key === 'i' || e.key === 'I') setClipIn(video.currentTime);
   else if (e.key === 'o' || e.key === 'O') setClipOut(video.currentTime);
 });
 updateClipUi();
 applyUnits();
+
+// ---------------------------------------------------------------- events
+
+const EVENT_LEAD_S = 5;    // start playback this long before an event, to see the lead-up
+const EVENT_CLIP_PRE = 10; // preset clip range around an event
+const EVENT_CLIP_POST = 10;
+
+function eventText(ev) {
+  const u = unit();
+  const speeds = `${Math.round(toUnit(ev.fromKmh))}→${Math.round(toUnit(ev.toKmh))} ${u.label}`;
+  const where = state.videos.length > 1 ? ` · video ${ev.vi + 1}` : '';
+  const sev = ev.severity === 'severe' ? ' (severe)' : '';
+  return `${ev.label}${sev} · ${ev.g.toFixed(2)} g · ${speeds} · ${fmtClock(Math.max(0, ev.t - state.offset))}${where}`;
+}
+
+function drawEventMarkers() {
+  eventLayer.clearLayers();
+  state.events.forEach((ev, k) => {
+    L.marker([ev.lat, ev.lon], { icon: eventIcon, zIndexOffset: 500, title: eventText(ev), keyboard: false })
+      .on('click', () => jumpToEvent(k)).addTo(eventLayer);
+  });
+}
+
+function updateEventsBar() {
+  const bar = $('eventsbar');
+  const hasTrack = tripTracks().some((t) => t.points.length);
+  bar.classList.toggle('hidden', !hasTrack);
+  $('ev-locked').classList.toggle('hidden', !currentVideo()?.locked);
+  const n = state.events.length;
+  bar.classList.toggle('none', n === 0);
+  if (!n) {
+    $('ev-label').textContent = 'No hard braking or swerves detected';
+    $('ev-count').textContent = '';
+    return;
+  }
+  const k = state.eventIdx;
+  $('ev-label').textContent = k >= 0 ? eventText(state.events[k]) : `${n} event${n > 1 ? 's' : ''} detected: jump to the first`;
+  $('ev-current').title = k >= 0 ? `${eventText(state.events[k])}: click to replay` : 'Jump to the first event';
+  $('ev-count').textContent = k >= 0 ? `${k + 1}/${n}` : '';
+  $('btn-ev-prev').disabled = k <= 0;
+  $('btn-ev-next').disabled = k >= n - 1;
+}
+
+/** Jump to event k: a few seconds before it, clip range preset around it, map on it. */
+function jumpToEvent(k) {
+  const ev = state.events[k];
+  if (!ev) return;
+  state.eventIdx = k;
+  const vt = ev.t - state.offset;
+  if (state.videos.length) {
+    const seek = Math.max(0, vt - EVENT_LEAD_S);
+    if (ev.vi !== state.current) showVideo(ev.vi, { seek });
+    else { video.currentTime = seek; video.play().catch(() => {}); }
+    state.clipIn = Math.max(0, vt - EVENT_CLIP_PRE);
+    state.clipOut = ev.tEnd - state.offset + EVENT_CLIP_POST;
+    setClipStatus('');
+    updateClipUi();
+  } else {
+    if (ev.vi !== state.current) showTrackItem(ev.vi);
+    seekTo(vt);
+  }
+  // Show the spot at street level; with Follow on the vehicle then stays centred.
+  if (state.follow) state.overview = false;
+  centerOn([ev.lat, ev.lon], Math.max(map.getZoom(), 16));
+  updateEventsBar();
+}
+
+function stepEvent(dir) {
+  if (!state.events.length) return;
+  jumpToEvent(Math.max(0, Math.min(state.events.length - 1, state.eventIdx < 0 ? 0 : state.eventIdx + dir)));
+}
+
+$('btn-ev-prev').addEventListener('click', () => stepEvent(-1));
+$('btn-ev-next').addEventListener('click', () => stepEvent(1));
+$('ev-current').addEventListener('click', () => jumpToEvent(Math.max(0, state.eventIdx)));
 
 // ---------------------------------------------------------------- fullscreen
 

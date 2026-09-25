@@ -8,7 +8,7 @@
 const TIMELINE_X = { left: 34, right: 10 };
 
 // eslint-disable-next-line no-unused-vars
-function createSpeedChart(container, { onSeek }) {
+function createSpeedChart(container, { onSeek, onEvent }) {
   const NS = 'http://www.w3.org/2000/svg';
   const M = { top: 14, bottom: 18, ...TIMELINE_X };
 
@@ -17,6 +17,7 @@ function createSpeedChart(container, { onSeek }) {
   let units = { label: 'km/h', factor: 1 };
   let clip = null;            // [a, b] or null
   let playhead = null;        // seconds or null
+  let events = [];            // [{ x: video seconds, label, key }] incident markers
   let W = 0, H = 0, yMax = 1;
 
   const el = (tag, attrs = {}, parent) => {
@@ -30,6 +31,7 @@ function createSpeedChart(container, { onSeek }) {
   const gGrid = el('g', {}, svg);
   const gClip = el('g', {}, svg);
   const gData = el('g', {}, svg);
+  const gEvents = el('g', {}, svg);
   const gPlay = el('g', {}, svg);
   const gHover = el('g', { class: 'sc-hover hidden' }, svg);
   const tooltip = document.createElement('div');
@@ -110,7 +112,25 @@ function createSpeedChart(container, { onSeek }) {
       }
     }
     drawClip();
+    drawEvents();
     drawPlayhead();
+  }
+
+  // Amber downward triangles along the top edge, with a faint guide line.
+  function drawEvents() {
+    gEvents.replaceChildren();
+    if (!W) return;
+    for (const ev of events) {
+      if (ev.x < domain[0] || ev.x > domain[1]) continue;
+      const x = xs(ev.x);
+      const g = el('g', { class: 'sc-event', role: 'button', 'aria-label': ev.label }, gEvents);
+      el('title', {}, g).textContent = ev.label;
+      el('line', { x1: x, x2: x, y1: M.top, y2: H - M.bottom }, g);
+      el('path', { d: `M${x - 6} ${M.top - 9}L${x + 6} ${M.top - 9}L${x} ${M.top + 1}Z` }, g);
+      // Generous invisible hit area.
+      el('rect', { x: x - 9, y: 0, width: 18, height: M.top + 6, fill: 'transparent' }, g);
+      g.addEventListener('click', (e) => { e.stopPropagation(); onEvent?.(ev.key); });
+    }
   }
 
   function drawClip() {
@@ -184,6 +204,7 @@ function createSpeedChart(container, { onSeek }) {
     },
     setUnits(u) { units = u; draw(); },
     setClip(range) { clip = range; drawClip(); },
+    setEvents(list) { events = list; drawEvents(); },
     setPlayhead(t) { playhead = t; drawPlayhead(); },
   };
 }

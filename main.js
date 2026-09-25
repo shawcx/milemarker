@@ -6,6 +6,7 @@ const { pathToFileURL } = require('url');
 const fs = require('fs');
 const gps = require('./src/gps');
 const { writeGpx } = require('./src/gps/gpx');
+const { detectEvents, isLockedPath } = require('./src/gps/events');
 const clip = require('./src/clip');
 const audio = require('./src/audio');
 
@@ -24,7 +25,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 500,
     backgroundColor: '#15171a',
-    title: 'Dashcam Track Viewer',
+    title: 'Milemarker',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -40,7 +41,7 @@ function createWindow() {
 
 // OSM tile usage policy requires an identifying User-Agent.
 function setupTileHeaders() {
-  const ua = `DashcamTrackViewer/${app.getVersion()} (Electron; +https://www.openstreetmap.org/copyright)`;
+  const ua = `Milemarker/${app.getVersion()} (Electron; +https://www.openstreetmap.org/copyright)`;
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['https://tile.openstreetmap.org/*'] },
     (details, cb) => {
@@ -49,6 +50,8 @@ function setupTileHeaders() {
     }
   );
 }
+
+const withEvents = (track) => Object.assign(track, { events: detectEvents(track.points) });
 
 // Dashcam filenames start with the recording time, so name order is trip order.
 const byName = (a, b) => path.basename(a).localeCompare(path.basename(b), undefined, { numeric: true });
@@ -61,9 +64,9 @@ async function loadVideos(paths) {
     const name = path.basename(videoPath);
     const progress = (p) => win?.webContents.send('scan-progress', { index: i, count: sorted.length, name, progress: p });
     progress(0);
-    const track = await gps.loadTrackForVideo(videoPath, progress);
+    const track = withEvents(await gps.loadTrackForVideo(videoPath, progress));
     openedVideos.add(videoPath);
-    videos.push({ videoPath, videoUrl: pathToFileURL(videoPath).href, name, track });
+    videos.push({ videoPath, videoUrl: pathToFileURL(videoPath).href, name, track, locked: isLockedPath(videoPath) });
   }
   return { videos };
 }
@@ -78,23 +81,32 @@ ipcMain.handle('open-video', async () => {
   return loadVideos(res.filePaths);
 });
 
+/** Load GPS files: { tracks: [{ name, track }] } in name order. */
+async function loadTrackFiles(paths) {
+  const sorted = [...paths].sort(byName);
+  const tracks = [];
+  for (const f of sorted) tracks.push({ name: path.basename(f), track: withEvents(await gps.loadTrackFile(f)) });
+  return { tracks };
+}
+
 ipcMain.handle('open-track', async () => {
   const res = await dialog.showOpenDialog(win, {
-    title: 'Open GPS track',
-    properties: ['openFile'],
+    title: 'Open GPS track(s)',
+    properties: ['openFile', 'multiSelections'],
     filters: [{ name: 'GPS track', extensions: TRACK_EXTS }, { name: 'All files', extensions: ['*'] }],
   });
-  if (res.canceled || !res.filePaths[0]) return null;
-  return { name: path.basename(res.filePaths[0]), track: await gps.loadTrackFile(res.filePaths[0]) };
+  if (res.canceled || !res.filePaths.length) return null;
+  return loadTrackFiles(res.filePaths);
 });
 
-// Drag-drop / CLI: any videos become a trip; otherwise the first track file is opened on its own.
+// Drag-drop / CLI: any videos become a trip (their GPX sidecars load with them);
+// otherwise all the track files are opened.
 ipcMain.handle('open-paths', async (_e, filePaths) => {
   const isTrack = (f) => TRACK_EXTS.includes(path.extname(f).slice(1).toLowerCase());
   const videos = filePaths.filter((f) => !isTrack(f));
   if (videos.length) return loadVideos(videos);
-  const trackFile = filePaths.find(isTrack);
-  return trackFile ? { name: path.basename(trackFile), track: await gps.loadTrackFile(trackFile) } : null;
+  const tracks = filePaths.filter(isTrack);
+  return tracks.length ? loadTrackFiles(tracks) : null;
 });
 
 function checkVideo(videoPath) {

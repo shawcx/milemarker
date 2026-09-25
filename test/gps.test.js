@@ -87,7 +87,7 @@ test('Novatek: fixes are placed by record index, not GPS time (no-fix records, r
   close(track.points[12].lat, fixes[12].lat);
 });
 
-test('GPX videoTime extension overrides timestamp timing', async () => {
+test('GPX videoTime overrides timestamp timing (incl. legacy dtv: prefix from before the rename)', async () => {
   const file = path.join(tmp, 'clip.gpx');
   fs.writeFileSync(file, `<gpx xmlns:dtv="urn:dashcam-track-viewer"><trk><trkseg>
     <trkpt lat="1" lon="2"><time>2026-01-01T00:00:10Z</time><extensions><dtv:videoTime>22.000</dtv:videoTime></extensions></trkpt>
@@ -128,6 +128,11 @@ test('scanned GPS is cached as GPX and reused on the next load', async () => {
   assert.deepStrictEqual(second.stats, { records: 8, noFix: 2 });
   assert.strictEqual(second.timing, 'record');
   assert.deepStrictEqual(second.points.map((p) => p.t), first.points.map((p) => p.t));
+
+  // Opening the cache directly as a GPS file keeps the same origin and no-fix count.
+  const direct = await loadTrackFile(first.cachePath);
+  assert.strictEqual(direct.source, 'embedded: Novatek freeGPS (from 2025_0629_100230_941.gpx)');
+  assert.deepStrictEqual(direct.stats, { records: 8, noFix: 2 });
   second.points.forEach((p, i) => {
     close(p.lat, first.points[i].lat, 1e-6);
     close(p.speed, first.points[i].speed, 0.01);
@@ -155,7 +160,7 @@ test('a cache older than its video is rescanned and rewritten; user GPX is never
   assert.strictEqual(third.cached, true);
   assert.strictEqual(third.points.length, 5);
 
-  // A user's own GPX (no dtv:source) is used even when older than the video.
+  // A user's own GPX (no mm:source) is used even when older than the video.
   const own = path.join(dir, 'mine.mp4');
   fs.writeFileSync(own, Buffer.concat(drive(3).map(freeGpsBox)));
   fs.writeFileSync(path.join(dir, 'mine.gpx'), '<gpx><trk><trkseg><trkpt lat="1" lon="2"/><trkpt lat="1.1" lon="2"/></trkseg></trk></gpx>');

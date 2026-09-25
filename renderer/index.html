@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; media-src file: blob:; connect-src 'none'">
-  <title>Dashcam Track Viewer</title>
+  <title>Milemarker</title>
   <link rel="stylesheet" href="../node_modules/leaflet/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -46,6 +46,16 @@
 
     <div id="speed-chart" class="speed-chart" title="Speed over time — click to seek"></div>
     <div id="waveform" class="waveform hidden" title="Audio — click to seek"></div>
+    <div id="eventsbar" class="eventsbar hidden">
+      <button id="btn-ev-prev" class="icon" title="Previous event (P)">◀</button>
+      <button id="ev-current" class="ev-current" title="Jump to this event">
+        <svg class="ev-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" /><path class="ev-bang" d="M8 6v3.6M8 11.4v.4" /></svg>
+        <span id="ev-label">–</span>
+      </button>
+      <button id="btn-ev-next" class="icon" title="Next event (N)">▶</button>
+      <span id="ev-count" class="muted"></span>
+      <span id="ev-locked" class="locked-chip hidden" title="The camera locked this recording (G-sensor or button), so something happened in it">🔒 Locked by camera</span>
+    </div>
     <div class="clipbar">
       <button id="btn-in" title="Set clip start to current time (I)">⟦ In</button>
       <span id="clip-range" class="range">–</span>

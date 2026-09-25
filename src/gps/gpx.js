@@ -2,8 +2,9 @@
 
 // Minimal GPX reader: pulls <trkpt>/<rtept> lat, lon, <time>, <speed>, <course>.
 // Regex-based to avoid an XML dependency; good enough for typical GPX exports.
-// Also reads our own <dtv:videoTime> element (seconds into the video), written with
-// exported clips so their track stays in sync even across GPS dropouts.
+// Also reads our own <mm:videoTime> element (seconds into the video), written with GPS caches
+// and exported clips so their track stays in sync even across GPS dropouts. Tags are matched
+// regardless of prefix, so files written before the rename (dtv:) still load.
 
 const PT_RE = /<(?:trkpt|rtept)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:trkpt|rtept)>)/g;
 
@@ -59,7 +60,7 @@ const unescapeXml = (x) => x.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(
 
 /**
  * Serialise track points ({ lat, lon, speed km/h, heading, timestamp, t }) as GPX 1.0.
- * `t` (seconds into the video) is kept in a <dtv:videoTime> element so the track stays in
+ * `t` (seconds into the video) is kept in a <mm:videoTime> element so the track stays in
  * sync on reload. <time> is only written for fixes that have a real GPS timestamp.
  */
 function writeGpx(points, { name = '', source, records } = {}) {
@@ -68,16 +69,16 @@ function writeGpx(points, { name = '', source, records } = {}) {
       (p.timestamp != null ? `<time>${new Date(Math.round(p.timestamp)).toISOString()}</time>` : '') +
       (p.speed != null ? `<speed>${(p.speed / 3.6).toFixed(3)}</speed>` : '') +
       (p.heading != null ? `<course>${p.heading.toFixed(1)}</course>` : '') +
-      (Number.isFinite(p.t) ? `<dtv:videoTime>${p.t.toFixed(3)}</dtv:videoTime>` : '') +
+      (Number.isFinite(p.t) ? `<mm:videoTime>${p.t.toFixed(3)}</mm:videoTime>` : '') +
       '</trkpt>';
   });
   // GPX 1.0 has no <metadata>/<extensions>; it allows foreign-namespace elements inline.
   const ext = [
-    source ? `  <dtv:source>${escapeXml(source)}</dtv:source>\n` : '',
-    Number.isFinite(records) ? `  <dtv:records>${records}</dtv:records>\n` : '',
+    source ? `  <mm:source>${escapeXml(source)}</mm:source>\n` : '',
+    Number.isFinite(records) ? `  <mm:records>${records}</mm:records>\n` : '',
   ].join('');
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.0" creator="Dashcam Track Viewer" xmlns="http://www.topografix.com/GPX/1/0" xmlns:dtv="urn:dashcam-track-viewer">
+<gpx version="1.0" creator="Milemarker" xmlns="http://www.topografix.com/GPX/1/0" xmlns:mm="urn:milemarker">
   <name>${escapeXml(name)}</name>
 ${ext}  <trk>
     <name>${escapeXml(name)}</name>

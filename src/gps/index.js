@@ -174,7 +174,11 @@ async function loadTrackForVideo(videoPath, onProgress, { readSidecar = true, wr
 
 async function loadTrackFile(filePath) {
   const text = await fs.promises.readFile(filePath, 'utf8');
-  return finalizeTrack(parseTrackText(filePath, text), path.basename(filePath));
+  const pts = parseTrackText(filePath, text);
+  // A GPX we wrote (cache or clip export) knows its origin and how many records had no fix.
+  const meta = filePath.toLowerCase().endsWith('.gpx') ? parseGpxMeta(text) : {};
+  const name = path.basename(filePath);
+  return finalizeTrack(pts, meta.source ? `${meta.source} (from ${name})` : name, { records: meta.records ?? pts.length });
 }
 
 module.exports = { loadTrackForVideo, loadTrackFile, scanVideo, finalizeTrack, cachePathFor };

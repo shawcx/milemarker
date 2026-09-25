@@ -99,6 +99,38 @@ body.dragging .panel { outline: 2px dashed var(--accent); outline-offset: -2px; 
 .no-video video, .no-video .clipbar, .no-video .gauge, .no-video .fs-btn { display: none !important; }
 .no-track .speed-chart { display: none; }
 
+/* Events: hard braking / swerves detected from GPS, plus camera-locked files */
+:root { --event: #f5a524; }
+.eventsbar { display: flex; align-items: center; gap: 4px; padding: 7px 12px 0 8px; flex-wrap: wrap; }
+.ev-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+}
+.ev-current #ev-label { overflow: hidden; text-overflow: ellipsis; }
+.eventsbar.none .ev-current { background: none; border-color: transparent; color: var(--muted); cursor: default; }
+.eventsbar.none .ev-icon, .eventsbar.none .icon { display: none; }
+.ev-icon { width: 15px; height: 15px; flex-shrink: 0; }
+.ev-icon path, .ev-marker path { fill: var(--event); stroke: #1b1e22; stroke-width: 1.2; stroke-linejoin: round; }
+.ev-icon .ev-bang, .ev-marker .ev-bang { fill: none; stroke: #1b1e22; stroke-width: 1.8; stroke-linecap: round; }
+#ev-count { font-size: 12px; white-space: nowrap; }
+.locked-chip {
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 165, 36, 0.5);
+  color: var(--text);
+}
+.ev-marker svg { display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); cursor: pointer; }
+/* Event ticks on the speed chart */
+.sc-event path { fill: var(--event); stroke: #111316; stroke-width: 1.2; cursor: pointer; }
+.sc-event line { stroke: var(--event); stroke-width: 1; opacity: 0.45; }
+
 /* Collapsible metadata section */
 .meta { border-top: 1px solid var(--border); }
 .meta-header { display: flex; align-items: center; padding-right: 18px; }
