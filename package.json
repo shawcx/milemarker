@@ -6,22 +6,112 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "dist": "electron-builder --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "fetch-ffmpeg": "node scripts/fetch-ffmpeg.js",
+    "icon": "electron scripts/render-icon.js"
   },
-  "author": "",
+  "author": {
+    "name": "Matthew Shaw",
+    "email": "milemarker@shaw.cx"
+  },
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^44.4.5"
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "ffmpeg-static": "^5.3.0"
   },
   "dependencies": {
-    "@ffprobe-installer/ffprobe": "^2.1.2",
-    "ffmpeg-static": "^5.3.0",
     "leaflet": "^1.9.4"
   },
   "private": true,
   "allowScripts": {
     "ffmpeg-static@5.3.0": true,
-    "@ffprobe-installer/linux-x64@5.2.0": true
-  }
+    "@ffprobe-installer/linux-x64@5.2.0": true,
+    "electron-winstaller@5.4.0": true
+  },
+  "build": {
+    "appId": "com.milemarker.app",
+    "productName": "Milemarker",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "beforePack": "scripts/before-pack.js",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "AudioVideo",
+      "synopsis": "Dashcam trips on a map; jump to the incident",
+      "syncDesktopName": true,
+      "extraResources": [
+        {
+          "from": ".cache/ffmpeg/linux-${arch}",
+          "to": "ffmpeg"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "extraResources": [
+        {
+          "from": ".cache/ffmpeg/win32-${arch}",
+          "to": "ffmpeg"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-${version}-setup-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.video",
+      "extraResources": [
+        {
+          "from": ".cache/ffmpeg/darwin-${arch}",
+          "to": "ffmpeg"
+        }
+      ],
+      "identity": "-",
+      "hardenedRuntime": false
+    }
+  },
+  "desktopName": "milemarker.desktop"
 }

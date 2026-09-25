@@ -1,0 +1,46 @@
+# Builds Milemarker on each OS's own runner (macOS apps must be signed on a Mac, and
+# Windows installers are simplest to make on Windows). Run it from the Actions tab, or
+# push a tag like v1.0.0. The installers are attached to the run as artifacts.
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        if: runner.os == 'Linux'
+        run: npm test
+
+      - name: Build installers
+        run: npm run dist
+        env:
+          # No signing certificates configured: Windows builds are unsigned, macOS ad-hoc signed.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: milemarker-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            dist/*.AppImage
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip

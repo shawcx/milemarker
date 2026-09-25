@@ -14,6 +14,33 @@ node scripts/make-sample.js    # writes samples/synthetic.mp4 with fake embedded
 node scripts/make-sample.js 20 --trip 3   # samples/trip/TRIP_0001..3.mp4: one drive split over 3 files
 ```
 
+## Building installers
+
+Packaging uses [electron-builder](https://www.electron.build); output goes to `dist/`.
+
+| Command | Produces | Build on |
+|---|---|---|
+| `npm run dist:linux` | `Milemarker-<ver>-linux-x86_64.AppImage` | Linux |
+| `npm run dist:win` | `…-setup-x64.exe` (installer) and `…-portable-x64.exe` | Windows, or Linux via `./scripts/dist-win-docker.sh` |
+| `npm run dist:mac` | `.dmg` and `.zip`, Apple Silicon and Intel | macOS only |
+| `npm run dist` | whatever the current OS builds | |
+
+- **ffmpeg/ffprobe**: the npm packages only fetch binaries for the machine you're on, so packaging
+  downloads the *target's* binaries (`scripts/fetch-ffmpeg.js`, cached in `.cache/ffmpeg/`) and ships
+  them in the app's `resources/ffmpeg/` along with their licence. `src/clip.js` prefers those.
+- **Windows on Linux** needs Wine for the NSIS installer; `scripts/dist-win-docker.sh` runs the build in
+  electron-builder's Wine image (`electronuserland/builder:wine`, ~6 GB) instead of installing Wine.
+- **macOS** must be built on a Mac (DMG tooling and code signing are macOS-only). Builds are ad-hoc
+  signed, which Apple Silicon requires; without an Apple Developer ID they aren't notarized, so on first
+  launch use right-click → Open (or `xattr -dr com.apple.quarantine /Applications/Milemarker.app`).
+- **All three at once**: `.github/workflows/build.yml` builds on GitHub's Linux, Windows and macOS runners
+  (run it from the Actions tab or push a `v*` tag) and attaches the installers to the run.
+- Nothing is code-signed with a real certificate, so Windows SmartScreen and macOS Gatekeeper will warn.
+- The icon is `build/icon.svg`; `npm run icon` re-renders `build/icon.png`, from which the `.ico`/`.icns`
+  are generated.
+- A Linux `.deb` needs a project homepage in `package.json`; add one and put `"deb"` back in
+  `build.linux.target`.
+
 ## Features
 - **Trips**: open (or drop) several videos at once; they're ordered by filename (dashcams name files by
   start time) and play back to back. The map shows the whole trip; ◀ / ▶ and the list switch videos, and
@@ -71,7 +98,4 @@ add a parser and a step in `loadTrackForVideo()`.
 - The ffmpeg packages download/prepare their binaries in npm install scripts, which are approved in
   `package.json` → `allowScripts`. Approvals are per version and per platform package, so after upgrading
   or installing on another OS/arch, run `npm install-scripts ls` and approve the new entries.
-- When packaging (e.g. electron-builder), the binaries must be unpacked from the asar:
-  `"asarUnpack": ["node_modules/ffmpeg-static/**", "node_modules/@ffprobe-installer/**"]`.
-  `src/clip.js` already rewrites `app.asar` → `app.asar.unpacked` in the paths.
 - The bundled ffmpeg builds are GPL-licensed; keep that in mind if you distribute the app.

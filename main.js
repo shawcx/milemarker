@@ -13,6 +13,8 @@ const audio = require('./src/audio');
 const VIDEO_EXTS = ['mp4', 'mov', 'MP4', 'MOV', 'ts', 'TS', 'avi', 'AVI', 'mkv'];
 const TRACK_EXTS = ['gpx', 'nmea', 'log', 'txt'];
 
+const DEV_ICON = path.join(__dirname, 'build', 'icon.png');
+
 let win;
 const openedVideos = new Set(); // paths the user opened; renderer requests are checked against it
 let activeExport = null;
@@ -26,6 +28,8 @@ function createWindow() {
     minHeight: 500,
     backgroundColor: '#15171a',
     title: 'Milemarker',
+    // Packaged builds get their icon from the installer; this covers `npm start` on Linux.
+    icon: fs.existsSync(DEV_ICON) ? DEV_ICON : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a3446"/>
+      <stop offset="1" stop-color="#12161c"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b4352"/>
+      <stop offset="1" stop-color="#555e6e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.41" cy="0.42" r="0.45" gradientTransform="translate(0 0.23) scale(1 0.45)">
+      <stop offset="0" stop-color="#3b8eea" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#3b8eea" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tile"><rect x="64" y="64" width="896" height="896" rx="200"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="64" y="64" width="896" height="896" fill="url(#bg)"/>
+    <!-- horizon glow -->
+    <rect x="64" y="64" width="896" height="896" fill="url(#glow)"/>
+    <!-- road -->
+    <path d="M378 420 L462 420 L760 960 L80 960 Z" fill="url(#road)"/>
+    <path d="M378 420 L80 960" stroke="#e9edf2" stroke-width="14" opacity="0.8"/>
+    <path d="M462 420 L760 960" stroke="#e9edf2" stroke-width="14" opacity="0.8"/>
+    <!-- centre dashes, shrinking toward the horizon -->
+    <path d="M414 445 L416 470" stroke="#f2c230" stroke-width="8" stroke-linecap="round"/>
+    <path d="M411 510 L405 565" stroke="#f2c230" stroke-width="13" stroke-linecap="round"/>
+    <path d="M400 625 L390 715" stroke="#f2c230" stroke-width="19" stroke-linecap="round"/>
+    <path d="M384 790 L370 930" stroke="#f2c230" stroke-width="26" stroke-linecap="round"/>
+  </g>
+  <!-- mile marker post -->
+  <rect x="757" y="560" width="26" height="330" rx="6" fill="#9aa3ad"/>
+  <rect x="674" y="250" width="192" height="330" rx="26" fill="#1f7a3d" stroke="#f4f6f8" stroke-width="16"/>
+  <text x="770" y="352" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="58" fill="#f4f6f8">MILE</text>
+  <text x="770" y="510" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="128" fill="#f4f6f8">42</text>
+</svg>

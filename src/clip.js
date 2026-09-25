@@ -1,7 +1,10 @@
 'use strict';
 
-// Clip export via ffmpeg/ffprobe bundled from npm (ffmpeg-static, @ffprobe-installer/ffprobe).
-// FFMPEG_PATH / FFPROBE_PATH override them; if a package is missing, falls back to PATH.
+// Clip export via ffmpeg/ffprobe. Where the binaries come from, first match wins:
+//   1. FFMPEG_PATH / FFPROBE_PATH
+//   2. the packaged app's resources/ffmpeg/ (per-platform, see scripts/fetch-ffmpeg.js)
+//   3. the npm packages used in development (ffmpeg-static, @ffprobe-installer/ffprobe)
+//   4. whatever is on PATH
 //
 // Two modes:
 //   fast    - stream copy. Near-instant, lossless, but must start on a keyframe,
@@ -10,19 +13,26 @@
 //   precise - re-encode (H.264/AAC). Frame-accurate, slower.
 
 const { execFile, spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-function bundled(load) {
+function packaged(tool) {
+  if (!process.resourcesPath) return null; // plain Node (tests, scripts)
+  const p = path.join(process.resourcesPath, 'ffmpeg', tool + (process.platform === 'win32' ? '.exe' : ''));
+  return fs.existsSync(p) ? p : null;
+}
+
+function fromNpm(load) {
   try {
-    const p = load();
-    // Binaries can't execute from inside an asar archive; electron-builder unpacks them alongside.
-    return p ? p.replace(`app.asar${require('path').sep}`, `app.asar.unpacked${require('path').sep}`) : null;
+    return load() || null;
   } catch {
-    return null;
+    return null; // not installed (e.g. packaged app, where these are dev-only)
   }
 }
 
-const FFMPEG = process.env.FFMPEG_PATH || bundled(() => require('ffmpeg-static')) || 'ffmpeg';
-const FFPROBE = process.env.FFPROBE_PATH || bundled(() => require('@ffprobe-installer/ffprobe').path) || 'ffprobe';
+const FFMPEG = process.env.FFMPEG_PATH || packaged('ffmpeg') || fromNpm(() => require('ffmpeg-static')) || 'ffmpeg';
+const FFPROBE = process.env.FFPROBE_PATH || packaged('ffprobe') ||
+  fromNpm(() => require('@ffprobe-installer/ffprobe').path) || 'ffprobe';
 
 function probe(args) {
   return new Promise((resolve, reject) => {
