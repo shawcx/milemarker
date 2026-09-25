@@ -119,8 +119,11 @@ test('scanned GPS is cached as GPX and reused on the next load', async () => {
   assert.strictEqual(first.cachePath, path.join(dir, '2025_0629_100230_941.gpx'));
   assert.ok(fs.existsSync(first.cachePath));
 
-  // Make the video unscannable: the second load must come from the cache alone.
+  // Make the video unscannable: the second load must come from the cache alone. Backdate it,
+  // or it would be newer than the cache and (correctly) trigger a rescan.
   fs.writeFileSync(video, Buffer.alloc(1000));
+  const past = new Date(Date.now() - 60_000);
+  fs.utimesSync(video, past, past);
   const second = await loadTrackForVideo(video);
   assert.strictEqual(second.cached, true);
   assert.strictEqual(second.source, 'embedded: Novatek freeGPS (cached in 2025_0629_100230_941.gpx)');
