@@ -18,7 +18,7 @@
     "name": "Matthew Shaw",
     "email": "milemarker@shaw.cx"
   },
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
     "@ffprobe-installer/ffprobe": "^2.1.2",

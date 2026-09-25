@@ -98,4 +98,9 @@ add a parser and a step in `loadTrackForVideo()`.
 - The ffmpeg packages download/prepare their binaries in npm install scripts, which are approved in
   `package.json` → `allowScripts`. Approvals are per version and per platform package, so after upgrading
   or installing on another OS/arch, run `npm install-scripts ls` and approve the new entries.
-- The bundled ffmpeg builds are GPL-licensed; keep that in mind if you distribute the app.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Packaged builds include ffmpeg and ffprobe as separate programs; those are
+GPL-licensed builds from [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), and their licence
+ships alongside them in `resources/ffmpeg/`. Map data © OpenStreetMap contributors (ODbL).
