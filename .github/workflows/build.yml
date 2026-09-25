@@ -41,6 +41,7 @@ jobs:
           if-no-files-found: error
           path: |
             dist/*.AppImage
+            dist/*.deb
             dist/*.exe
             dist/*.dmg
             dist/*.zip

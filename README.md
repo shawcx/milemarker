@@ -20,7 +20,7 @@ Packaging uses [electron-builder](https://www.electron.build); output goes to `d
 
 | Command | Produces | Build on |
 |---|---|---|
-| `npm run dist:linux` | `Milemarker-<ver>-linux-x86_64.AppImage` | Linux |
+| `npm run dist:linux` | `Milemarker-<ver>-linux-x86_64.AppImage` and `.deb` | Linux |
 | `npm run dist:win` | `…-setup-x64.exe` (installer) and `…-portable-x64.exe` | Windows, or Linux via `./scripts/dist-win-docker.sh` |
 | `npm run dist:mac` | `.dmg` and `.zip`, Apple Silicon and Intel | macOS only |
 | `npm run dist` | whatever the current OS builds | |
@@ -38,8 +38,6 @@ Packaging uses [electron-builder](https://www.electron.build); output goes to `d
 - Nothing is code-signed with a real certificate, so Windows SmartScreen and macOS Gatekeeper will warn.
 - The icon is `build/icon.svg`; `npm run icon` re-renders `build/icon.png`, from which the `.ico`/`.icns`
   are generated.
-- A Linux `.deb` needs a project homepage in `package.json`; add one and put `"deb"` back in
-  `build.linux.target`.
 
 ## Features
 - **Trips**: open (or drop) several videos at once; they're ordered by filename (dashcams name files by

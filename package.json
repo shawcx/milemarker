@@ -3,6 +3,14 @@
   "productName": "Milemarker",
   "version": "1.0.0",
   "description": "Visualize dashcam trips on a map and jump straight to the moment that matters",
+  "homepage": "https://github.com/shawcx/milemarker",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shawcx/milemarker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shawcx/milemarker/issues"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -53,7 +61,8 @@
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb"
       ],
       "category": "AudioVideo",
       "synopsis": "Dashcam trips on a map; jump to the incident",
